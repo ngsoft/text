@@ -87,5 +87,6 @@ return [
         'PhanUnusedClosureParameter',
         'PhanUndeclaredFunctionInCallable',
         'PhanRedefineClass',
+        'PhanParamTooFewInternalUnpack',
     ]
 ];
