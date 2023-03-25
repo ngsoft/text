@@ -1,0 +1,38 @@
+{
+    "name": "ngsoft/text",
+    "description": "Provides an object-oriented API to strings .",
+    "keywords": [
+        "string",
+        "utf8", 
+        "utf-8", 
+        "unicode", 
+        "stringable",
+        "javascript",
+        "python",
+        "slice"
+    ],
+    "license": "MIT",
+    "authors": [{
+            "name": "Aymeric Anger",
+            "role": "Developer",
+            "homepage": "https://github.com/ngsoft"
+        }],
+    "suggest": {},
+    "provide": {},
+    "require-dev": {  },
+    "require": {
+        "php": ">=8.1",
+        "ext-mbstring": "*"
+
+    },
+    "autoload": {
+        "psr-4": {
+            "NGSOFT\\": "src/"
+        },
+        "files": [
+            "lib/index.php"
+        ]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
