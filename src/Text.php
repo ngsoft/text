@@ -8,24 +8,32 @@ use ArrayAccess,
     Closure,
     Countable,
     IteratorAggregate,
-    JsonSerializable;
-use NGSOFT\{
-    DataStructure\SimpleIterator, Text\Slice, Traits\CloneUtils
-};
-use OutOfRangeException,
+    JsonSerializable,
+    OutOfRangeException,
     Stringable,
     Traversable;
 use const MB_CASE_TITLE;
-use function mb_convert_case,
+use function in_range,
+             mb_convert_case,
              mb_str_split,
              mb_strlen,
              mb_strpos,
              mb_strtolower,
              mb_strtoupper,
-             mb_substr;
-use function NGSOFT\Text\{
-    every, in_range, preg_exec, preg_test, preg_valid, str_val, value
-};
+             mb_substr,
+             preg_exec,
+             preg_test,
+             preg_valid,
+             str_val,
+             value;
+
+/**
+ * Dynamic load dependencies if ngsoft/tools:^3 not detected
+ */
+if ( ! class_exists('NGSOFT\\Tools'))
+{
+    require_once __DIR__ . '/../lib/index.php';
+}
 
 /**
  * A String manipulation utility that implements the best of Python and JavaScript
@@ -33,10 +41,14 @@ use function NGSOFT\Text\{
 class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, JsonSerializable
 {
 
+    /**
+     * Library Version
+     */
     public const VERSION = '1.0.0';
 
-    use CloneUtils;
-
+    /**
+     * Default text encoding for ext-mbstring functions
+     */
     public const DEFAULT_ENCODING = 'UTF-8';
 
     /**
@@ -268,6 +280,42 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
     public function getSize(): int
     {
         return $this->size;
+    }
+
+    /**
+     * Clone Object with defined properties
+     */
+    protected function cloneWithProperties(array $properties): static
+    {
+
+        $clone = $this->clone();
+
+        foreach ($properties as $prop => $value)
+        {
+            if (property_exists($clone, $prop))
+            {
+                $clone->{$prop} = $value;
+            }
+        }
+
+        return $clone;
+    }
+
+    /**
+     * Get a clone of the current object
+     */
+    protected function clone(): static
+    {
+        return clone $this;
+    }
+
+    /**
+     * Clone object using named variadic properties
+     *     Usage: $this->with(myfirstprop: 'value', mysecondprop: true ...)
+     */
+    protected function with(mixed ... $properties): static
+    {
+        return $this->cloneWithProperties($properties);
     }
 
     /**
@@ -545,7 +593,18 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
      */
     public function containsAll(iterable $needles, bool $caseless = false): bool
     {
-        return every(fn($needle) => $this->contains($needle, $caseless), $needles);
+
+        $length = 0;
+        foreach ($needles as $needle)
+        {
+            if ( ! $this->contains($needle, $caseless))
+            {
+                return false;
+            }
+            $length ++;
+        }
+
+        return $length > 0;
     }
 
     /**
@@ -561,7 +620,7 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
      */
     public function matchAll(string $pattern): \Traversable
     {
-        return SimpleIterator::of(preg_exec($pattern, $this->text, 0), true);
+        yield from preg_exec($pattern, $this->text, 0);
     }
 
     /**

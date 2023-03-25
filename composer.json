@@ -3,9 +3,9 @@
     "description": "Provides an object-oriented API to strings .",
     "keywords": [
         "string",
-        "utf8", 
-        "utf-8", 
-        "unicode", 
+        "utf8",
+        "utf-8",
+        "unicode",
         "stringable",
         "javascript",
         "python",
@@ -27,10 +27,7 @@
     "autoload": {
         "psr-4": {
             "NGSOFT\\": "src/"
-        },
-        "files": [
-            "lib/index.php"
-        ]
+        }
     },
     "minimum-stability": "dev",
     "prefer-stable": true

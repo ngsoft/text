@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-namespace NGSOFT\Text;
+namespace NGSOFT;
 
 use ArrayAccess,
     Countable,
     InvalidArgumentException,
-    NGSOFT\DataStructure\Range,
     Stringable,
     Throwable,
     Traversable;
@@ -84,6 +83,44 @@ final class Slice implements Stringable
     }
 
     /**
+     * A micro version of the ngsoft/tools Range class inside a single function
+     */
+    private static function getRangeIterator(int $start, ?int $stop = null, int $step = 1): \Traversable
+    {
+        if (is_null($stop))
+        {
+            $stop = $start;
+            $start = 0;
+        }
+
+        if ($step > 0 ? $stop <= $start : $stop >= $start)
+        {
+            return;
+        }
+
+        [$min, $max] = [$start, $stop];
+
+        if ($min > $max)
+        {
+            [$min, $max] = [$max, $min];
+        }
+
+        $length = intval(ceil(($max - $min) / abs($step)));
+
+        for ($offset = 0; $offset < $length; $offset ++)
+        {
+
+            $index = $offset;
+            if (0 > $index)
+            {
+                $index += $length;
+            }
+
+            yield $start + ($index * $step);
+        }
+    }
+
+    /**
      * Creates an offset iterator for value
      */
     public function getIteratorFor(array|Countable $value): Traversable
@@ -105,7 +142,7 @@ final class Slice implements Stringable
             $stop += $len;
         }
 
-        foreach (Range::create($start, $stop, $step) as $offset)
+        foreach (static::getRangeIterator($start, $stop, $step) as $offset)
         {
 
             if ($offset >= $len && $step > 0)
