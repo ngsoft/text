@@ -29,8 +29,10 @@ use function in_range,
 
 /**
  * Dynamic load dependencies if ngsoft/tools:^3 not detected
+ * It is not loaded by composer because we cannot know if ngsoft/tools is loaded at that time,
+ * instead it is loaded when we first call the class: new Text();
  */
-if ( ! class_exists('NGSOFT\\Tools'))
+if ( ! function_exists('\\str_val'))
 {
     require_once __DIR__ . '/../lib/index.php';
 }

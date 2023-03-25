@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+/**
+ * Function required by this project.
+ * They are to be loaded at runtime (after composer autoloading) if ngsoft/tools:^3 is not used by the current project
+ */
+
 namespace
 {
     require_once __DIR__ . '/errors.php';
@@ -142,9 +147,6 @@ namespace
 
         /**
          * Return the default value of the given value.
-         *
-         * @param  mixed  $value
-         * @return mixed
          */
         function value(mixed $value, ...$args): mixed
         {

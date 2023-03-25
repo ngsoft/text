@@ -17,9 +17,7 @@
             "role": "Developer",
             "homepage": "https://github.com/ngsoft"
         }],
-    "suggest": {},
-    "provide": {},
-    "require-dev": {},
+
     "require": {
         "php": ">=8.1",
         "ext-mbstring": "*"
@@ -27,8 +25,8 @@
     "autoload": {
         "psr-4": {
             "NGSOFT\\": "src/"
-        }
-    },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+        }, "files": [
+            "lib/functions.php"
+        ]
+    }
 }
