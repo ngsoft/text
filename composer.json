@@ -1,32 +1,36 @@
 {
-    "name": "ngsoft/text",
-    "description": "Provides an object-oriented API to strings .",
-    "keywords": [
-        "string",
-        "utf8",
-        "utf-8",
-        "unicode",
-        "stringable",
-        "javascript",
-        "python",
-        "slice"
-    ],
-    "license": "MIT",
-    "authors": [{
-            "name": "Aymeric Anger",
-            "role": "Developer",
-            "homepage": "https://github.com/ngsoft"
-        }],
-
-    "require": {
-        "php": ">=8.1",
-        "ext-mbstring": "*"
-    },
-    "autoload": {
-        "psr-4": {
-            "NGSOFT\\": "src/"
-        }, "files": [
-            "lib/functions.php"
-        ]
+  "name": "ngsoft/text",
+  "description": "Provides an object-oriented API to strings .",
+  "version": "1.1.0",
+  "keywords": [
+    "string",
+    "utf8",
+    "utf-8",
+    "unicode",
+    "stringable",
+    "javascript",
+    "python",
+    "slice"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Aymeric Anger",
+      "role": "Developer",
+      "homepage": "https://github.com/ngsoft"
     }
+  ],
+  "require": {
+    "php": ">=8.1",
+    "ext-mbstring": "*",
+    "ngsoft/tools": "^4.1.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "NGSOFT\\": "src/"
+    }
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.62"
+  }
 }

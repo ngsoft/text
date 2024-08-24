@@ -1,112 +1,54 @@
 <?php
 
+/**
+ * @noinspection PhpDocMissingThrowsInspection
+ * @noinspection PhpUnhandledExceptionInspection
+ * @noinspection PhpMultipleClassDeclarationsInspection
+ */
+
 declare(strict_types=1);
 
 namespace NGSOFT;
 
-use ArrayAccess,
-    Closure,
-    Countable,
-    IteratorAggregate,
-    JsonSerializable,
-    OutOfRangeException,
-    Stringable,
-    Traversable;
-use const MB_CASE_TITLE;
-use function in_range,
-             mb_convert_case,
-             mb_str_split,
-             mb_strlen,
-             mb_strpos,
-             mb_strtolower,
-             mb_strtoupper,
-             mb_substr,
-             preg_exec,
-             preg_test,
-             preg_valid,
-             str_val,
-             value;
+use NGSOFT\DataStructure\Slice;
+use NGSOFT\Traits\CloneAble;
 
-/**
- * Dynamic load dependencies if ngsoft/tools:^3 not detected
- * It is not loaded by composer because we cannot know if ngsoft/tools is loaded at that time,
- * instead it is loaded when we first call the class: new Text();
- */
-if ( ! function_exists('\\str_val'))
+class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializable, \ArrayAccess
 {
-    require_once __DIR__ . '/../lib/index.php';
-}
-
-/**
- * A String manipulation utility that implements the best of Python and JavaScript
- */
-class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, JsonSerializable
-{
-
+    use CloneAble;
     /**
-     * Library Version
+     * Library Version.
      */
-    public const VERSION = '1.0.0';
+    public const VERSION          = '1.1.0';
 
     /**
-     * Default text encoding for ext-mbstring functions
+     * Default text encoding.
      */
     public const DEFAULT_ENCODING = 'UTF-8';
 
-    /**
-     * Text to be managed
-     *
-     * @var string
-     */
-    protected string $text;
+    protected string $text        = '';
+
+    protected int $length         = 0;
+    protected int $size           = 0;
 
     /**
-     * mb_default_encoding
-     * @var string
+     * @var ?array<int,int>
      */
-    protected string $encoding;
+    protected ?array $map         = null;
 
-    /**
-     * Hosts the real string length
-     * @var int
-     */
-    protected int $length;
-
-    /**
-     * Hosts the byte size
-     * @var int
-     */
-    protected int $size;
-
-    /**
-     * Hosts the multibyte char convertion map (for regex)
-     * @var int[]
-     */
-    protected array $map;
-
-    /**
-     * Construct a new Text instance
-     */
-    public static function of(mixed $text, string $encoding = self::DEFAULT_ENCODING): static
-    {
-        return new static($text, $encoding);
+    public function __construct(
+        mixed $text = '',
+        protected string $encoding = self::DEFAULT_ENCODING
+    ) {
+        $this->init($text);
     }
 
-    public function __construct(mixed $text, string $encoding = self::DEFAULT_ENCODING)
+    public function __debugInfo(): array
     {
-        $this->encoding = $encoding;
-        $this->initialize($text);
-    }
-
-    protected function initialize(mixed $text): static
-    {
-        $text = str_val($text);
-        $this->map = [];
-        $this->text = $text;
-        $this->length = mb_strlen($text, $this->encoding);
-        $this->size = strlen($text);
-
-        return $this;
+        return [
+            'text'   => $this->text,
+            'length' => $this->length,
+        ];
     }
 
     public function __serialize(): array
@@ -116,127 +58,7 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
 
     public function __unserialize(array $data): void
     {
-        $this->encoding = $data[1];
-        $this->initialize($data[0]);
-    }
-
-    public function __debugInfo(): array
-    {
-
-        return [
-            'text' => $this->text,
-            'normalized' => trim(json_encode($this->text, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_LINE_TERMINATORS), '"')
-        ];
-    }
-
-    /**
-     * get byte to multibyte char map
-     */
-    protected function getMap(): array
-    {
-
-        if (empty($this->map) && $this->length > 0)
-        {
-
-            if ($this->length === $this->size)
-            {
-                $this->map = range(0, $this->length - 1);
-            }
-            else
-            {
-                // build char map
-                for ($offset = 0; $offset < $this->length; $offset ++ )
-                {
-                    $char = $this->at($offset);
-                    for ($byte = 0; $byte < strlen($char); $byte ++ )
-                    {
-                        $this->map[] = $offset;
-                    }
-                }
-            }
-        }
-
-        return $this->map;
-    }
-
-    protected function getByteOffset(int $offset): int
-    {
-
-        if (0 === $offset)
-        {
-            return $offset;
-        }
-
-
-        $result = array_search($offset, $this->getMap());
-        return $result === false ? -1 : $result;
-    }
-
-    protected function getMultibyteOffset(int $offset): int
-    {
-        if (0 === $offset)
-        {
-            return $offset;
-        }
-
-        return $this->getMap()[$offset] ?? -1;
-    }
-
-    public function getIterator(): Traversable
-    {
-
-        if ($this->length > 0)
-        {
-            for ($offset = 0; $offset < $this->length; $offset ++ )
-            {
-
-                yield $this->at($offset);
-            }
-        }
-    }
-
-    /**
-     * Count the number of occurences of value
-     * if no value supplied it will returns the lenght of the string (\Countable)
-     */
-    public function count(mixed $value = null): int
-    {
-        if (null === $value)
-        {
-            return $this->length;
-        }
-
-
-        $value = str_val($value);
-
-        $count = $offset = 0;
-
-        while ($offset < $this->length)
-        {
-            [$str, $offset] = $this->indexOfTuple($value, $offset);
-
-            if ($offset === -1)
-            {
-                break;
-            }
-
-            $count ++;
-            $offset += mb_strlen($str, $this->encoding);
-        }
-        return $count;
-    }
-
-    public function jsonSerialize(): mixed
-    {
-        return $this->toString();
-    }
-
-    /**
-     * String representation of Text
-     */
-    public function toString(): string
-    {
-        return $this->text;
+        $this->__construct(...$data);
     }
 
     public function __toString(): string
@@ -244,255 +66,150 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
         return $this->text;
     }
 
-    /**
-     * Checks if empty text
-     */
-    public function isEmpty(): bool
-    {
-        return $this->count() === 0;
-    }
-
-    /**
-     * Returns current text
-     */
-    public function getText(): string
+    public function toString(): string
     {
         return $this->text;
     }
 
-    /**
-     * Returns encoding
-     */
     public function getEncoding(): string
     {
         return $this->encoding;
     }
 
-    /**
-     * Returns multibyte length
-     */
+    public function getSize(): int
+    {
+        return $this->size;
+    }
+
     public function getLength(): int
     {
         return $this->length;
     }
 
     /**
-     * Returns byte size
+     * Construct a new Text instance.
      */
-    public function getSize(): int
+    public static function of(mixed $text, string $encoding = self::DEFAULT_ENCODING): static
     {
-        return $this->size;
+        return new static($text, $encoding);
     }
 
     /**
-     * Clone Object with defined properties
+     * Repeat text until targeted length has been reached.
      */
-    protected function cloneWithProperties(array $properties): static
+    public static function pad(int $length, mixed $text = ' ', string $encoding = self::DEFAULT_ENCODING): static
     {
+        $i    = static::of('', $encoding);
 
-        $clone = $this->clone();
-
-        foreach ($properties as $prop => $value)
+        if ($length < 1)
         {
-            if (property_exists($clone, $prop))
-            {
-                $clone->{$prop} = $value;
-            }
+            return $i;
+        }
+        $text = str_val($text);
+        $pad  = '';
+
+        while (mb_strlen($pad, $encoding) < $length)
+        {
+            $pad .= $text;
         }
 
-        return $clone;
+        $pad  = mb_substr($pad, 0, $length, $encoding);
+
+        return $i->init($pad);
     }
 
     /**
-     * Get a clone of the current object
+     * The at() method takes an integer value and returns the character located at the specified offset.
      */
-    protected function clone(): static
+    public function at(int $offset): string
     {
-        return clone $this;
-    }
-
-    /**
-     * Clone object using named variadic properties
-     *     Usage: $this->with(myfirstprop: 'value', mysecondprop: true ...)
-     */
-    protected function with(mixed ... $properties): static
-    {
-        return $this->cloneWithProperties($properties);
-    }
-
-    /**
-     * Get a new instance with given merged texts
-     */
-    public function withText(mixed ...$text): static
-    {
-        if (empty($text))
-        {
-            $text = '';
-        }
-        else
-        {
-            $text = implode('', array_map(fn($mixed) => str_val($mixed), $text));
-        }
-
-
-        return $this->clone()->initialize($text);
-    }
-
-    /**
-     * Get a new instance with specified encoding
-     */
-    public function withEncoding(string $encoding): static
-    {
-        return $this->with(encoding: $encoding)->initialize($this->text);
-    }
-
-    ////////////////////////////   JS Implementation (with some modifications)   ////////////////////////////
-
-    /**
-     * returns a tuple [string, int]
-     */
-    protected function indexOfTuple(string $needle, int $offset): array
-    {
-
-        static $failure = ['', -1];
-
-        // regex?
-        if (preg_valid($needle))
-        {
-
-            if (preg_match($needle, $this->text, $matches, PREG_OFFSET_CAPTURE, $offset))
-            {
-
-                [$str, $offset] = $matches[0];
-
-                return [$str, $this->getMultibyteOffset($offset)];
-            }
-
-            return $failure;
-        }
-        elseif (false === $result = mb_strpos($this->text, $needle, $offset, $this->encoding))
-        {
-            return $failure;
-        }
-
-        return [$needle, $result];
-    }
-
-    /**
-     * transforms negative offsets into positive ones
-     */
-    protected function translateOffset(int $offset): int
-    {
-
-        if ($offset < 0)
-        {
-            $offset += $this->length;
-        }
-
-        return $offset;
-    }
-
-    /**
-     * The valueOf() method returns the primitive value of a Text object
-     */
-    public function valueOf(): string
-    {
-        return $this->text;
-    }
-
-    /**
-     * The indexOf() method, given one argument: a substring/regex to search for,
-     * searches the entire calling string, and returns the index of the first occurrence of the specified substring, -1 on failure
-     */
-    public function indexOf(mixed $needle, int $offset = 0): int
-    {
-
-        $needle = str_val($needle);
-
-        if ($needle === '' || $this->isEmpty() || $offset > $this->length)
-        {
-            return -1;
-        }
-
-        return $this->indexOfTuple($needle, $offset)[1];
-    }
-
-    /**
-     * Alias of indexOf
-     */
-    public function search(mixed $needle): int
-    {
-        return $this->indexOf($needle);
-    }
-
-    /**
-     * The lastIndexOf() method, given one argument: a substring/regex to search for,
-     * searches the entire calling string, and returns the index of the last occurrence of the specified substring, -1 on failure
-     */
-    public function lastIndexOf(mixed $needle, int $offset = PHP_INT_MAX): int
-    {
-
-        if ($needle === '' || $this->isEmpty() || $offset < 0)
-        {
-            return -1;
-        }
-
-
-        $result = -1;
-        $pos = 0;
-
-        while ($pos < $this->length)
-        {
-            [$str, $index] = $this->indexOfTuple($needle, $pos);
-
-            if ($index === -1 || $index > $offset)
-            {
-                break;
-            }
-
-            $result = $index;
-            $pos = $index + mb_strlen($str, $this->encoding);
-        }
-
-
-        return $result;
-    }
-
-    /**
-     * The at() method takes an integer value and returns the character located at the specified offset
-     */
-    public function at(int $offset = 0): string
-    {
-
-
-        $offset = $this->translateOffset($offset);
-
-        if ($this->isEmpty() || ! in_range($offset, 0, $this->length - 1))
+        if ($this->isEmpty())
         {
             return '';
         }
 
-        return mb_substr($this->text, $offset, 1, $this->encoding);
+        return mb_substr($this->text, $this->translate($offset), 1, $this->encoding);
     }
 
     /**
-     * The charAt() method takes an integer value and returns the character located at the specified offset as a text instance
+     * The charAt() method takes an integer value and returns the character located at the specified offset as a text instance.
      */
-    public function charAt(int $offset = 0): static
+    public function charAt(int $offset): static
     {
         return $this->withText($this->at($offset));
     }
 
     /**
-     * The concat() method concatenates the string arguments to the current Text and returns a new instance
+     * The indexOf() method, given one argument: a substring/regex to search for,
+     * searches the entire calling string, and returns the index of the first occurrence of the specified substring, -1 on failure.
      */
-    public function concat(mixed ...$strings): static
+    public function indexOf(mixed $needle, int $offset = 0): int
     {
-        return $this->withText($this->text, ...$strings);
+        $needle = strval($needle);
+
+        if ('' === $needle || $this->isEmpty() || $offset > $this->length)
+        {
+            return -1;
+        }
+
+        return $this->findString($needle, $offset)[1];
     }
 
     /**
-     * Converts Text to lower case
+     * The lastIndexOf() method, given one argument: a substring/regex to search for,
+     * searches the entire calling string, and returns the index of the last occurrence of the specified substring, -1 on failure.
+     */
+    public function lastIndexOf(mixed $needle, int $offset = PHP_INT_MAX): int
+    {
+        $needle = strval($needle);
+
+        if ('' === $needle || $this->isEmpty() || $offset <= 0)
+        {
+            return -1;
+        }
+
+        $result = -1;
+
+        $pos    = 0;
+        $max    = min($offset, $this->length);
+
+        while ($pos < $max)
+        {
+            [$str,$i] = $this->findString($needle, $pos);
+
+            if ($i > $offset || $i < 0)
+            {
+                break;
+            }
+
+            $result   = $i;
+            $pos      = $i + mb_strlen($str, $this->encoding);
+        }
+
+        return $result;
+    }
+
+    /**
+     * The concat() method concatenates the string arguments to the current Text and returns a new instance.
+     */
+    public function concat(mixed ...$values): static
+    {
+        return $this->withText($this->merge($this->text, ...$values));
+    }
+
+    /**
+     * Returns new Text with prefix added.
+     */
+    public function prepend(mixed ...$prefix): static
+    {
+        $prefix[] = $this->text;
+        return $this->withText(
+            $this->merge(...$prefix)
+        );
+    }
+
+    /**
+     * Converts Text to lower case.
      */
     public function toLowerCase(): static
     {
@@ -500,7 +217,7 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
     }
 
     /**
-     * Converts Text to upper case
+     * Converts Text to upper case.
      */
     public function toUpperCase(): static
     {
@@ -508,67 +225,36 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
     }
 
     /**
-     * Returns a tuple of arguments
-     */
-    protected function caselessArgs(string $needle, bool $caseless): array
-    {
-        if ($caseless)
-        {
-            return [mb_strtolower($this->text, $this->encoding), mb_strtolower($needle, $this->encoding)];
-        }
-
-        return [$this->text, $needle];
-    }
-
-    /**
-     * The endsWith() method determines whether a string ends with the characters of a specified string, returning true or false as appropriate.
+     * The endsWith() method determines whether a string ends with the characters of a specified text, returning true or false as appropriate.
      */
     public function endsWith(mixed $needle, bool $caseless = false): bool
     {
-        if ($this->isEmpty())
+        if ($this->isEmpty() || '' === $needle = str_val($needle))
         {
             return false;
         }
-
-        if ('' === $needle = str_val($needle))
-        {
-            return false;
-        }
-
-
-        return str_ends_with(...$this->caselessArgs($needle, $caseless));
+        return str_ends_with(...$this->caseLess($needle, $caseless));
     }
 
     /**
-     * The startsWith() method determines whether a string begins with the characters of a specified string, returning true or false as appropriate.
+     * The startsWith() method determines whether a string begins with the characters of a specified text, returning true or false as appropriate.
      */
     public function startsWith(mixed $needle, bool $caseless = false): bool
     {
-        if ($this->isEmpty())
+        if ($this->isEmpty() || '' === $needle = str_val($needle))
         {
             return false;
         }
-
-        if ('' === $needle = str_val($needle))
-        {
-            return false;
-        }
-
-        return str_starts_with(...$this->caselessArgs($needle, $caseless));
+        return str_starts_with(...$this->caseLess($needle, $caseless));
     }
 
     /**
-     * The contains() method performs a search to determine whether one string may be found within another string/regex,
+     * The contains() method performs a search to determine whether one text may be found within another text/regex,
      * returning true or false as appropriate.
      */
     public function contains(mixed $needle, bool $caseless = false): bool
     {
-        if ($this->isEmpty())
-        {
-            return false;
-        }
-
-        if ('' === $needle = str_val($needle))
+        if ($this->isEmpty() || '' === $needle = str_val($needle))
         {
             return false;
         }
@@ -577,12 +263,11 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
         {
             return preg_match($needle, $this->text) > 0;
         }
-
-        return str_contains(...$this->caselessArgs($needle, $caseless));
+        return str_contains(...$this->caseLess($needle, $caseless));
     }
 
     /**
-     * The includes() method performs a case-sensitive search to determine whether one string may be found within another string, returning true or false as appropriate.
+     * The includes() method performs a case-sensitive search to determine whether one text may be found within another text, returning true or false as appropriate.
      */
     public function includes(mixed $needle): bool
     {
@@ -590,29 +275,51 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
     }
 
     /**
-     * The containsAll() method performs a search to determine whether one string may be found within multiple other string/regex,
-     * returning true or false as appropriate.
+     * Checks if at least one value is contained within a text.
+     * This is case-sensitive.
      */
-    public function containsAll(iterable $needles, bool $caseless = false): bool
+    public function containsSome(mixed ...$values): bool
     {
-
-        $length = 0;
-        foreach ($needles as $needle)
+        if ( ! $values)
         {
-            if ( ! $this->contains($needle, $caseless))
-            {
-                return false;
-            }
-            $length ++;
+            return false;
         }
 
-        return $length > 0;
+        foreach ($values as $value)
+        {
+            if ($this->includes($value))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * The match() method retrieves the result of matching a string against a regular expression.
+     * Checks if all values are contained within a text.
+     * This is case-sensitive.
      */
-    public function match(string $pattern): array
+    public function containsEvery(mixed ...$values): bool
+    {
+        if ( ! $values)
+        {
+            return false;
+        }
+
+        foreach ($values as $value)
+        {
+            if ( ! $this->includes($value))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The matches() method retrieves the first result of matching a text against a regular expression.
+     */
+    public function matches(string $pattern): array
     {
         return preg_exec($pattern, $this->text);
     }
@@ -620,38 +327,18 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
     /**
      * The matchAll() method returns an iterator of all results matching a string against a regular expression, including capturing groups.
      */
-    public function matchAll(string $pattern): \Traversable
+    public function matchAll(string $pattern): iterable
     {
         yield from preg_exec($pattern, $this->text, 0);
     }
 
     /**
-     * Utility function for pads
-     */
-    protected function getPadding(int $length, string $padString): string
-    {
-
-        if ($padString === '' || $length < 1)
-        {
-            return '';
-        }
-
-        $str = '';
-        while (mb_strlen($str, $this->encoding) < $length)
-        {
-            $str .= $padString;
-        }
-
-        return mb_substr($str, 0, $length, $this->encoding);
-    }
-
-    /**
      * The padStart() method pads the current string with another string (multiple times, if needed) until the resulting string reaches the given length.
-     * The padding is applied from the start of the current string.
+     * The padding is applied from the start of the current text.
      */
     public function padStart(int $targetLength, mixed $padString = ' '): static
     {
-        $length = $this->length - $targetLength;
+        $length    = $targetLength - $this->length;
         $padString = str_val($padString);
 
         if ($length < 1 || '' === $padString)
@@ -659,17 +346,16 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
             return $this;
         }
 
-
-        return $this->withText($this->getPadding($length, $padString), $this->text);
+        return $this->prepend(static::pad($length, $padString));
     }
 
     /**
      * The padEnd() method pads the current string with a given string (repeated, if needed) so that the resulting string reaches a given length.
-     * The padding is applied from the end of the current string.
+     * The padding is applied from the end of the current text.
      */
     public function padEnd(int $targetLength, mixed $padString = ' '): static
     {
-        $length = $this->length - $targetLength;
+        $length    = $targetLength - $this->length;
         $padString = str_val($padString);
 
         if ($length < 1 || '' === $padString)
@@ -677,71 +363,193 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
             return $this;
         }
 
-
-        return $this->withText($this->text, $this->getPadding($length, $padString));
+        return $this->concat(static::pad($length, $padString));
     }
 
     /**
-     * The padEnd() method pads the current string with a given string (repeated, if needed) so that the resulting string reaches a given length.
-     * The padding is applied to the start and the end of the current string.
+     * The padAll() method pads the current string with a given string (repeated, if needed) so that the resulting string reaches a given length.
+     * The padding is applied to the beginning and the end of the current text.
      */
-    public function pad(int $targetLength, mixed $padString = ' '): static
+    public function padAll(int $targetLength, mixed $padString = ' '): static
     {
+        $length       = $targetLength - $this->length;
 
-        $length = $this->length - $targetLength;
-        $padString = str_val($padString);
-
-        if ($length < 1 || '' === $padString)
+        if ($length < 1)
         {
             return $this;
         }
 
-        $endPad = $this->length + intval(ceil($length / 2));
+        $endPadLength = $this->length + intval(ceil($length / 2));
 
-        return $this->padEnd($endPad, $padString)->padStart($targetLength, $padString);
+        return $this
+            ->padEnd($endPadLength, $padString)
+            ->padStart($targetLength, $padString)
+        ;
     }
 
     /**
-     * The repeat() method constructs and returns a new string which contains the specified number of copies of the string on which it was called,
-     * concatenated together.
+     * The repeat() method returns a new text which contains the specified number of copies concatenated together.
      */
     public function repeat(int $times): static
     {
+        if ($times < 1)
+        {
+            return $this->withText();
+        }
 
         if ($times < 2)
         {
             return $this;
         }
 
-        $str = '';
-
-        for ($i = 0; $i < $times; $i ++ )
-        {
-            $str .= $this->text;
-        }
-
-        return $this->withText($str);
+        return $this->concat(...array_fill(0, $times - 1, $this));
     }
 
     /**
-     * Replace the first occurrence of a given value in the string.
+     * The slice() method extracts a section of a text and returns it as a new text.
      */
-    public function replace(mixed $search, mixed $replacement): static
+    public function slice(int $indexStart, ?int $indexEnd = null): static
     {
+        $indexEnd ??= $this->length;
 
-        [$str, $index] = $this->indexOfTuple(str_val($search), 0);
+        [$indexStart,$indexEnd] = [$this->translate($indexStart), $this->translate($indexEnd)];
 
-        if (-1 === $index)
+        if ($indexEnd <= $indexStart)
+        {
+            return $this->withText();
+        }
+
+        return $this->withText(
+            mb_substr($this->text, $indexStart, $indexEnd - $indexStart, $this->encoding)
+        );
+    }
+
+    /**
+     * The trim() method removes whitespace or specified chars from both ends of a text and returns a new text.
+     */
+    public function trim(mixed ...$values): static
+    {
+        if ( ! count($values))
+        {
+            return $this->withText(trim($this->text));
+        }
+        return $this->withText(
+            trim(
+                $this->text,
+                $this->merge(...$values)
+            )
+        );
+    }
+
+    /**
+     * The trimStart() method removes whitespace or specified chars from the beginning of a text and returns a new text.
+     */
+    public function trimStart(mixed ...$values): static
+    {
+        if ( ! count($values))
+        {
+            return $this->withText(ltrim($this->text));
+        }
+        return $this->withText(
+            ltrim(
+                $this->text,
+                $this->merge(...$values)
+            )
+        );
+    }
+
+    /**
+     * The trimEnd() method removes whitespace or specified chars from the end of a text and returns a new text.
+     */
+    public function trimEnd(mixed ...$values): static
+    {
+        if ( ! count($values))
+        {
+            return $this->withText(rtrim($this->text));
+        }
+        return $this->withText(
+            rtrim(
+                $this->text,
+                $this->merge(...$values)
+            )
+        );
+    }
+
+    /**
+     * If the string starts with the prefix string,
+     * return string[len(prefix):]. Otherwise, return a copy of the original string:
+     */
+    public function removePrefix(mixed $prefix): static
+    {
+        if ( ! $this->startsWith($prefix))
         {
             return $this;
         }
 
-        $replacement = str_val($replacement);
+        return $this->slice(mb_strlen(str_val($prefix), $this->encoding));
+    }
+
+    /**
+     * If the string ends with the suffix string and that suffix is not empty, return string[:-len(suffix)].
+     * Otherwise, return a copy of the original string:
+     */
+    public function removeSuffix(mixed $suffix): static
+    {
+        if ( ! $this->endsWith($suffix))
+        {
+            return $this;
+        }
+        return $this->slice(0, -mb_strlen(str_val($suffix), $this->encoding));
+    }
+
+    /**
+     * Reverse the Text.
+     */
+    public function reverse(): static
+    {
+        return $this->withText($this->merge(...reversed($this)));
+    }
+
+    /**
+     * Return a copy of the text with uppercase characters converted to lowercase and vice versa.
+     */
+    public function swapCase(): static
+    {
+        $text = $this->text;
+        return $this->withText(mb_strtolower($text, $this->encoding) ^ mb_strtoupper($text, $this->encoding) ^ $text);
+    }
+
+    /**
+     * Replace the first occurrence of a given value in the string.
+     * The pattern can be a text or a RegExp, and the replacement can be a string or a function to be called for the `first` match.
+     */
+    public function replace(mixed $search, mixed $replacement): static
+    {
+        $search    = str_val($search);
+
+        if ('' === $search)
+        {
+            return $this;
+        }
+
+        [$str, $i] = $this->findString($search);
+
+        if (-1 === $i)
+        {
+            return $this;
+        }
+
+        if ( ! $replacement instanceof \Closure)
+        {
+            $replacement = str_val($replacement);
+        }
 
         return $this->withText(
-                        $this->slice(0, $index),
-                        $replacement,
-                        $this->slice($index + mb_strlen($str, $this->encoding))
+            $this->merge(
+                $this->slice(0, $i),
+                value($replacement, $str),
+                $this->slice($i + mb_strlen($str, $this->encoding))
+            )
         );
     }
 
@@ -751,157 +559,65 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
      */
     public function replaceAll(mixed $search, mixed $replacement): static
     {
-
         $search = str_val($search);
 
-        if ($search === '')
+        if ('' === $search)
         {
             return $this;
         }
 
-        if ($replacement instanceof Closure === false)
+        if ( ! $replacement instanceof \Closure)
         {
             $replacement = str_val($replacement);
         }
 
         if (preg_valid($search))
         {
+            $fn = 'preg_replace';
 
-            if ($replacement instanceof Closure)
+            if ($replacement instanceof \Closure)
             {
-                return $this->withText(preg_replace_callback($search, $replacement, $this->text));
-            }
-            return $this->withText(preg_replace($search, $replacement, $this->text));
-        }
-
-
-        return $this->withText(str_replace($search, value($replacement, $search), $this->text));
-    }
-
-    /**
-     * The substring() method returns the part of the string from the start index up to and excluding the end index,
-     * or to the end of the string if no end index is supplied.
-     */
-    public function substring(int $indexStart, ?int $indexEnd = null): static
-    {
-        if (is_null($indexEnd))
-        {
-            $indexEnd = $this->length;
-        }
-
-
-        if ($indexStart === $indexEnd)
-        {
-            return $this->withText('');
-        }
-
-        if ($indexStart > $indexEnd)
-        {
-            [$indexEnd, $indexStart] = [$indexStart, $indexEnd];
-        }
-
-        $str = '';
-        for ($i = $indexStart; $i < $indexEnd; $i ++ )
-        {
-
-            if ($i >= $this->length)
-            {
-                break;
+                $fn = 'preg_replace_callback';
             }
 
-            if ($i < 0)
-            {
-                continue;
-            }
-
-            $str .= $this->at($i);
+            return $this->withText(
+                $fn(
+                    $search,
+                    $replacement,
+                    $this->text
+                )
+            );
         }
 
-
-        return $this->withText($str);
+        return $this->withText(
+            str_replace(
+                $search,
+                value($replacement, $search),
+                $this->text
+            )
+        );
     }
 
     /**
-     * The slice() method extracts a section of a string and returns it as a new string
+     * Use sprintf to format string.
      */
-    public function slice(int $indexStart, ?int $indexEnd = null): static
+    public function format(mixed ...$args): static
     {
-        if (is_null($indexEnd))
+        if ( ! count($args) || $this->indexOf('%') < 0)
         {
-            $indexEnd = $this->length;
+            return $this;
         }
 
-        [$indexStart, $indexEnd] = [$this->translateOffset($indexStart), $this->translateOffset($indexEnd)];
-
-        if ($indexEnd <= $indexStart)
-        {
-            return $this->withText('');
-        }
-
-
-        $str = '';
-        for ($i = $indexStart; $i < $indexEnd; $i ++ )
-        {
-
-            if ($i >= $this->length)
-            {
-                break;
-            }
-
-            if ($i < 0)
-            {
-                continue;
-            }
-
-            $str .= $this->at($i);
-        }
-
-
-        return $this->withText($str);
+        return $this->withText(
+            vsprintf($this->text, $args)
+        );
     }
 
     /**
-     * Helper method for trim
-     */
-    protected function getChars(mixed ...$chars): string
-    {
-
-        if (empty($chars))
-        {
-            // trim default value
-            return " \n\r\t\v\x00";
-        }
-
-        return implode('', array_map(fn(mixed $char): string => str_val($char), $chars));
-    }
-
-    /**
-     * The trim() method removes whitespace from both ends of a string and returns a new string
-     */
-    public function trim(mixed ...$chars): static
-    {
-        return $this->withText(trim($this->text, $this->getChars(...$chars)));
-    }
-
-    /**
-     * The trimStart() method removes whitespace from the beginning of a string and returns a new string
-     */
-    public function trimStart(mixed ...$chars): static
-    {
-        return $this->withText(ltrim($this->text, $this->getChars(...$chars)));
-    }
-
-    /**
-     * The trimEnd() method removes whitespace from the end of a string and returns a new string
-     */
-    public function trimEnd(mixed ...$chars): static
-    {
-        return $this->withText(rtrim($this->text, $this->getChars(...$chars)));
-    }
-
-    /**
-     * The split() method takes a pattern and divides a String into an ordered list of substrings by searching for the pattern,
-     *  puts these substrings into an array, and returns the array.
+     * The split() method takes a pattern and divides a text into an ordered list of subtexts by searching for the pattern,
+     *  puts these subtexts into an array, and returns the array.
+     *
+     * @return static[]
      */
     public function split(mixed $separator = '', int $limit = PHP_INT_MAX): array
     {
@@ -911,338 +627,73 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
         }
 
         $result = [];
-        $separator = str_val($separator);
 
-        if ($separator === '')
+        if ('' === $separator)
         {
-            $result = mb_str_split($this->text, encoding: $this->encoding);
-        }
-        elseif (preg_valid($separator))
+            $result = mb_str_split($this->text, 1, $this->encoding);
+        } else
         {
-            $result = preg_split($separator, $this->text);
-        }
-        else
-        {
-            $result = explode($separator, $this->text);
+            $method = 'explode';
+
+            if (preg_valid($separator))
+            {
+                $method = 'preg_split';
+            }
+            $result = $method($separator, $this->text);
         }
 
-        while (count($result) > $limit)
-        {
-            array_pop($result);
-        }
-        return array_map(fn(string $str) => $this->withText($str), $result);
+        array_splice($result, $limit);
+
+        return array_map(fn ($str) => $this->withText($str), $result);
     }
-
-    ////////////////////////////   Python like methods (the ones that are not duplicates of JS)   ////////////////////////////
 
     /**
      * Return a copy of the string with its first character capitalized and the rest lowercased.
      */
     public function capitalize(): static
     {
-
-        if ($this->isEmpty())
-        {
-            return $this;
-        }
-
-        return $this->withText($this->charAt()->toUpperCase(), $this->slice(1)->toLowerCase());
+        return $this->charAt(0)->toUpperCase()->concat($this->slice(1)->toLowerCase());
     }
 
     /**
-     * Return a copy of the string where all tab characters are replaced by one or more spaces
+     * Return a copy of the string with its first character lowercases and the rest lowercased.
      */
-    public function expandTabs(int $tabsize = 8): static
+    public function upperFirst(): static
     {
-        return $this->replaceAll('/\t/', $this->getPadding($tabsize, ' '));
+        return $this->charAt(0)->toUpperCase()->concat($this->slice(1));
     }
 
     /**
-     * Return True if all characters in the string are alphanumeric and there is at least one character, False otherwise
+     * Return a copy of the string with its first character lowercases and the rest lowercased.
      */
-    public function isAlnum(): bool
+    public function lowerFirst(): static
     {
-        return ctype_alnum($this->text);
+        return $this->charAt(0)->toLowerCase()->concat($this->slice(1));
     }
 
     /**
-     * Return True if all characters in the string are alphabetic and there is at least one character, False otherwise.
+     * Return a Title cased version of the string where words start with an uppercase character and the remaining characters are lowercase.
      */
-    public function isAlpha(): bool
-    {
-        return ctype_alpha($this->text);
-    }
-
-    /**
-     * Return True if all characters in the string are decimal characters and there is at least one character, False otherwise
-     */
-    public function isDecimal(): bool
-    {
-        return preg_test('#^\d+$#', $this->text);
-    }
-
-    /**
-     * Return True if all characters in the string are digits and there is at least one character, False otherwise.
-     */
-    public function isDigit(): bool
-    {
-        return ctype_digit($this->text);
-    }
-
-    /**
-     * Return True if all cased characters in the string are lowercase and there is at least one cased character, False otherwise.
-     */
-    public function isLower(): bool
-    {
-        return preg_test('#[a-z]#', $this->text) && ! preg_test('#[A-Z]#', $this->text);
-    }
-
-    /**
-     * Finds whether a variable is a number or a numeric string
-     */
-    public function isNumeric(): bool
-    {
-        return is_numeric($this->text);
-    }
-
-    /**
-     * Return a titlecased version of the string where words start with an uppercase character and the remaining characters are lowercase.
-     */
-    public function title(): static
+    public function toTitleCase(): static
     {
         return $this->withText(mb_convert_case($this->text, MB_CASE_TITLE, $this->encoding));
     }
 
     /**
-     * Return True if the string is a titlecased string and there is at least one character,
-     * for example uppercase characters may only follow uncased characters and lowercase characters only cased ones.
-     * Return False otherwise.
+     * Return a copy of the text where all tab characters are replaced by one or more spaces.
      */
-    public function isTitle(): bool
+    public function expandTabs(int $size = 4): static
     {
-        return preg_test('#[A-Z]#', $this->text) && $this->title()->toString() === $this->text;
+        return $this->replaceAll('#\t#', self::pad($size));
     }
 
     /**
-     * Return True if there are only whitespace characters in the string and there is at least one character, False otherwise.
+     * Checks if needle equals current text.
      */
-    public function isSpace(): bool
-    {
-        return ctype_space($this->text);
-    }
-
-    /**
-     * Return True if all characters in the string are printable or the string is empty, False otherwise.
-     */
-    public function isPrintable(): bool
-    {
-        return $this->isEmpty() || ctype_print($this->text);
-    }
-
-    /**
-     * Checks if all of the characters in the provided Text,  are punctuation character.
-     */
-    public function isPunct(): bool
-    {
-        return ctype_punct($this->text);
-    }
-
-    /**
-     * Checks if all characters in Text are control characters
-     */
-    public function isControl(): bool
-    {
-        return ctype_cntrl($this->text);
-    }
-
-    /**
-     * Return True if all characters in the string are uppercase and there is at least one lowercase character, False otherwise.
-     */
-    public function isUpper(): bool
-    {
-        return ! preg_test('#[a-z]#', $this->text) && preg_test('#[A-Z]#', $this->text);
-    }
-
-    /**
-     * If the string starts with the prefix string,
-     * return string[len(prefix):]. Otherwise, return a copy of the original string:
-     */
-    public function removePrefix(mixed $prefix): static
-    {
-        if ($this->isEmpty() || empty($prefix = str_val($prefix)))
-        {
-            return $this;
-        }
-
-        if ($this->startsWith($prefix))
-        {
-            return $this->slice(mb_strlen($prefix, $this->encoding));
-        }
-
-        return $this;
-    }
-
-    /**
-     * If the string ends with the suffix string and that suffix is not empty, return string[:-len(suffix)].
-     * Otherwise, return a copy of the original string:
-     */
-    public function removeSuffix(mixed $suffix): static
-    {
-        if ($this->isEmpty() || empty($suffix = str_val($suffix)))
-        {
-            return $this;
-        }
-
-        if ($this->endsWith($suffix))
-        {
-            return $this->slice(0, - mb_strlen($suffix, $this->encoding));
-        }
-
-        return $this;
-    }
-
-    /**
-     * Reverse the string
-     */
-    public function reverse(): static
-    {
-
-        if ($this->isEmpty())
-        {
-            return $this;
-        }
-
-        $str = '';
-
-        for ($i = -1; $i >= -$this->length; $i -- )
-        {
-            $str .= $this->at($i);
-        }
-        return $this->withText($str);
-    }
-
-    /**
-     * Return a copy of the string with uppercase characters converted to lowercase and vice versa.
-     */
-    public function swapCase(): static
-    {
-
-        $text = $this->text;
-        return $this->withText(mb_strtolower($text, $this->encoding) ^ mb_strtoupper($text, $this->encoding) ^ $text);
-    }
-
-    ////////////////////////////   PHP Methods   ////////////////////////////
-
-    /**
-     * Use sprintf to format string
-     *
-     * @phan-suppress PhanPluginPrintfVariableFormatString
-     */
-    public function format(mixed ...$args): static
-    {
-
-        if (count($args) && $this->indexOf('%') > -1)
-        {
-            return $this->withText(sprintf($this->text, ...$args));
-        }
-
-        return $this;
-    }
-
-    /**
-     * Use ucfirst on the string
-     */
-    public function upperFirst(): static
-    {
-        if ($this->isEmpty())
-        {
-            return $this;
-        }
-
-        return $this->withText($this->charAt(0)->toUpperCase(), $this->slice(1));
-    }
-
-    /**
-     * Use lcfirst on the string
-     */
-    public function lowerFirst(): static
-    {
-        if ($this->isEmpty())
-        {
-            return $this;
-        }
-
-        return $this->withText($this->charAt(0)->toLowerCase(), $this->slice(1));
-    }
-
-    /**
-     * Returns new Text with suffix added
-     */
-    public function append(mixed ...$suffix): static
-    {
-        return $this->concat(...$suffix);
-    }
-
-    /**
-     * Returns new Text with prefix added
-     */
-    public function prepend(mixed ...$prefix): static
-    {
-        $prefix[] = $this->text;
-        return $this->withText(...$prefix);
-    }
-
-    /**
-     * Checks if Text is base 64 encoded
-     */
-    public function isBase64(): bool
-    {
-
-        if ($this->isEmpty())
-        {
-            return false;
-        }
-
-        $b64 = @base64_decode($this->text, true);
-
-        return $b64 !== false && @base64_encode($b64) === $this->text;
-    }
-
-    /**
-     * Checks if string is hexadecimal number
-     */
-    public function ishexadecimal(): bool
-    {
-        return ctype_xdigit($this->text);
-    }
-
-    /**
-     * Returns a base64 encoded Text
-     */
-    public function toBase64(): static
-    {
-        return $this->withText(base64_encode($this->text));
-    }
-
-    /**
-     * Returns a base64 decoded Text
-     */
-    public function decodeBase64(): static
-    {
-
-        if ($this->isBase64())
-        {
-            return $this->withText(base64_decode($this->text));
-        }
-        return $this;
-    }
-
-    /**
-     * Checks if needle equals current text
-     */
-    public function isEqual(mixed $needle, bool $caseless = false): bool
+    public function equals(mixed $needle, bool $caseless = false): bool
     {
         $needle = str_val($needle);
+
         if ($caseless)
         {
             return mb_strtolower($needle, $this->encoding) === $this->toLowerCase()->toString();
@@ -1251,7 +702,123 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
         return $needle === $this->text;
     }
 
-    ////////////////////////////   ArrayAccess/Slices   ////////////////////////////
+    /**
+     * Return true if there are only whitespace characters in the string and there is at least one character, false otherwise.
+     */
+    public function isWhiteSpace(): bool
+    {
+        return ctype_space($this->text);
+    }
+
+    /**
+     * Return true if all characters in the string are alphanumeric and there is at least one character, false otherwise.
+     */
+    public function isAlphaNumeric(): bool
+    {
+        return ctype_alnum($this->text);
+    }
+
+    /**
+     * Return true if all characters in the string are alphabetic and there is at least one character, false otherwise.
+     */
+    public function isAlpha(): bool
+    {
+        return ctype_alpha($this->text);
+    }
+
+    /**
+     * Return true if all characters in the string are numeric characters and there is at least one character, false otherwise.
+     */
+    public function isNumeric(): bool
+    {
+        return is_numeric($this->text);
+    }
+
+    /**
+     * Return true if all characters in the string are digits and there is at least one character, false otherwise.
+     */
+    public function isDigit(): bool
+    {
+        return ctype_digit($this->text);
+    }
+
+    /**
+     * Checks if string is hexadecimal number.
+     */
+    public function isHexadecimal(): bool
+    {
+        return ctype_xdigit($this->text);
+    }
+
+    /**
+     * Return true if all cased characters in the string are lowercase and there is at least one cased character, false otherwise.
+     */
+    public function isLower(): bool
+    {
+        return $this->size > 0 && $this->text === mb_strtolower($this->text, $this->encoding) && preg_test('#[a-z]#', $this->text);
+    }
+
+    /**
+     * Return true if all characters in the string are uppercase and there is at least one cased character, false otherwise.
+     */
+    public function isUpper(): bool
+    {
+        return $this->size > 0 && $this->text === mb_strtoupper($this->text, $this->encoding) && preg_test('#[A-Z]#', $this->text);
+    }
+
+    /**
+     * @return \Traversable<string>
+     */
+    public function getIterator(): \Traversable
+    {
+        for ($i = 0; $i < $this->length; ++$i)
+        {
+            yield $this->at($i);
+        }
+    }
+
+    public function isEmpty(): bool
+    {
+        return 0 === $this->size;
+    }
+
+    public function count(mixed $value = null): int
+    {
+        if ( ! isset($value))
+        {
+            return $this->length;
+        }
+
+        $value = str_val($value);
+
+        if ('' === $value)
+        {
+            return 0;
+        }
+
+        $count = $offset = 0;
+
+        while ($offset < $this->length)
+        {
+            [$str, $offset] = $this->findString($value, $offset);
+
+            if (-1 === $offset)
+            {
+                break;
+            }
+            ++$count;
+            $offset += mb_strlen($str, $this->encoding);
+
+            var_dump($offset, $str);
+        }
+
+        return $count;
+    }
+
+    public function jsonSerialize(): string
+    {
+        return $this->text;
+    }
 
     public function offsetExists(mixed $offset): bool
     {
@@ -1262,124 +829,218 @@ class Text implements Stringable, Countable, IteratorAggregate, ArrayAccess, Jso
     {
         if (is_numeric($offset))
         {
-            $offset = intval($offset);
+            return $this->charAt($this->translate(intval($offset)));
         }
 
         if (is_string($offset))
         {
-            if ( ! Slice::isValid($offset))
-            {
-                throw new OutOfRangeException(sprintf('Offset %s does not exists', $offset));
-            }
             $offset = Slice::of($offset);
         }
-        elseif (is_int($offset))
-        {
-            return $this->charAt($offset);
-        }
-
-        // we can also use slice instances directly as offsets
 
         if ($offset instanceof Slice)
         {
-            $str = '';
-
-            foreach ($offset->getIteratorFor($this) as $index)
-            {
-                $str .= $this->at($index);
-            }
-
-            return $this->withText($str);
+            return $this->withText(
+                $this->merge(...$offset->slice($this))
+            );
         }
 
-        // empty text
-        return $this->withText('');
+        return $this->withText();
     }
 
     public function offsetSet(mixed $offset, mixed $value): void
     {
-
-        // we cannot use slice there, that would be illogic (5:10:2 where to replace?)
-        if (is_numeric($offset))
-        {
-            $offset = intval($offset);
-        }
-        elseif (is_null($offset))
+        if (null === $offset)
         {
             $offset = $this->length;
         }
 
-        if ( ! is_int($offset))
+        if ( ! is_numeric($offset))
         {
-            throw new OutOfRangeException('Offset does not exists');
+            throw new \OutOfRangeException('Offset does not exists');
         }
-        $offset = $this->translateOffset($offset);
+
+        $offset = $this->translate(intval($offset));
 
         if ($offset < 0)
         {
+            throw new \OutOfRangeException("Offset {$offset} does not exists");
+        }
+
+        if ($offset > $this->length)
+        {
+            $this->init(
+                $this->merge(
+                    $this->padEnd($offset - $this->length),
+                    $value
+                )
+            );
             return;
         }
 
-        $value = str_val($value);
-
-        if ($offset >= $this->length)
-        {
-            // we add spaces until offset is reached
-            $str = $this->getPadding($offset - $this->length, ' ') . $value;
-            $this->initialize($this->text . $str);
-        }
-        else
-        {
-            // we insert value at offset removing only the char contained at that offset
-            $this->initialize($this->slice(0, $offset)->toString() . $value . $this->slice($offset + 1)->toString());
-        }
+        $this->init(
+            $this->merge(
+                $this->slice(0, $offset),
+                $value,
+                $this->slice($offset + 1)
+            )
+        );
     }
 
     public function offsetUnset(mixed $offset): void
     {
-
         if (is_numeric($offset))
         {
-            $offset = intval($offset);
-        }
+            $offset = $this->translate(intval($offset));
 
+            if ($offset >= 0 || $offset < $this->length)
+            {
+                $this->init(
+                    $this->merge(
+                        $this->slice(0, $offset),
+                        $this->slice($offset + 1)
+                    )
+                );
+            }
+
+            return;
+        }
 
         if (is_string($offset))
         {
-            if ( ! Slice::isValid($offset))
-            {
-                throw new OutOfRangeException(sprintf('Offset %s does not exists', $offset));
-            }
             $offset = Slice::of($offset);
         }
-        elseif (is_int($offset))
-        {
-            $offset = $this->translateOffset($offset);
 
-            if ($offset < 0 || $offset >= $this->length)
-            {
-                return;
-            }
-            // we remove the offset (it gets reassigned)
-            $this->initialize($this->slice(0, $offset)->toString() . $this->slice($offset + 1)->toString());
-        }
-
-        // we remove the slice
         if ($offset instanceof Slice)
         {
+            $segments = $this->split();
 
-            // we split the text
-            $segments = mb_str_split($this->text, encoding: $this->encoding);
-
-            foreach ($offset->getIteratorFor($this) as $index)
+            foreach ($offset->getIteratorFor($segments) as $n)
             {
-                // and removes the offsets one per one
-                unset($segments[$index]);
+                unset($segments[$n]);
             }
 
-
-            $this->initialize(implode('', $segments));
+            $this->init(
+                $this->merge(...$segments)
+            );
         }
     }
 
+    protected function merge(mixed ...$values): string
+    {
+        $newText = '';
+
+        foreach ($values as $value)
+        {
+            $newText .= str_val($value);
+        }
+        return $newText;
+    }
+
+    protected function findString(string $needle, int $offset = 0): array
+    {
+        static $fail = ['', -1];
+
+        if (preg_valid($needle))
+        {
+            if (
+                preg_match(
+                    $needle,
+                    $this->text,
+                    $matches,
+                    PREG_OFFSET_CAPTURE,
+                    $this->getOffset($offset, false)
+                )
+            ) {
+                return [$matches[0][0], $this->getOffset(intval($matches[0][1]))];
+            }
+
+            return $fail;
+        }
+
+        if (false === $offset = mb_strpos($this->text, $needle, $offset, $this->encoding))
+        {
+            return $fail;
+        }
+
+        return [$needle, $offset];
+    }
+
+    protected function init(mixed $text = ''): static
+    {
+        $this->map    = null;
+        $text         = str_val($text);
+        $this->size   = strlen($text);
+        $this->length = mb_strlen($text, $this->encoding);
+        $this->text   = $text;
+
+        return $this;
+    }
+
+    protected function getCharMap(): array
+    {
+        if (null === $this->map)
+        {
+            $this->map = [0];
+
+            if ($this->size > 0)
+            {
+                $this->map = [];
+
+                for ($i = 0; $i < $this->length; ++$i)
+                {
+                    $char = mb_substr($this->text, $i, 1, $this->encoding);
+                    $size = strlen($char);
+
+                    for ($b = 0; $b < $size; ++$b)
+                    {
+                        $this->map[] = $i;
+                    }
+                }
+            }
+        }
+
+        return $this->map;
+    }
+
+    protected function getOffset(int $offset, bool $mb = true): int
+    {
+        if (0 === $offset)
+        {
+            return $offset;
+        }
+
+        $map = $this->getCharMap();
+
+        if ($mb)
+        {
+            return $map[$offset] ?? -1;
+        }
+        $o   = array_search($offset, $map, true);
+        return false === $o ? -1 : $o;
+    }
+
+    protected function translate(int $offset): int
+    {
+        if ($offset < 0)
+        {
+            $offset += $this->length;
+        }
+
+        return $offset;
+    }
+
+    protected function caseLess(string $needle, bool $caseless): array
+    {
+        if ( ! $caseless)
+        {
+            return [$this->text, $needle];
+        }
+
+        return [$this->toLowerCase()->toString(), self::of($needle)->toLowerCase()->toString()];
+    }
+
+    protected function withText(mixed ...$values): static
+    {
+        return $this->copy()->init($this->merge(...$values));
+    }
 }
