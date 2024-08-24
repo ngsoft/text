@@ -808,8 +808,6 @@ class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializ
             }
             ++$count;
             $offset += mb_strlen($str, $this->encoding);
-
-            var_dump($offset, $str);
         }
 
         return $count;
