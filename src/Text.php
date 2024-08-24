@@ -194,7 +194,7 @@ class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializ
      */
     public function concat(mixed ...$values): static
     {
-        return $this->withText($this->merge($this->text, ...$values));
+        return $this->withText($this->text, ...$values);
     }
 
     /**
@@ -204,7 +204,7 @@ class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializ
     {
         $prefix[] = $this->text;
         return $this->withText(
-            $this->merge(...$prefix)
+            ...$prefix
         );
     }
 
@@ -507,7 +507,7 @@ class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializ
      */
     public function reverse(): static
     {
-        return $this->withText($this->merge(...reversed($this)));
+        return $this->withText(...reversed($this));
     }
 
     /**
@@ -545,11 +545,9 @@ class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializ
         }
 
         return $this->withText(
-            $this->merge(
-                $this->slice(0, $i),
-                value($replacement, $str),
-                $this->slice($i + mb_strlen($str, $this->encoding))
-            )
+            $this->slice(0, $i),
+            value($replacement, $str),
+            $this->slice($i + mb_strlen($str, $this->encoding))
         );
     }
 
@@ -838,7 +836,7 @@ class Text implements \Stringable, \IteratorAggregate, \Countable, \JsonSerializ
         if ($offset instanceof Slice)
         {
             return $this->withText(
-                $this->merge(...$offset->slice($this))
+                ...$offset->slice($this)
             );
         }
 
